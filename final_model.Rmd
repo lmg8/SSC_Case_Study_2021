@@ -29,13 +29,19 @@ library(deSolve)
 library(lubridate)
 library(ggforce)
 library(ggrepel)
-library(sysfonts)
-library(showtext)
-font_add("minion", regular = "Minion Pro Regular.ttf",
-         bold = "Minion Pro Bold.ttf", italic = "Minion Pro Cond Italic.otf")
+library(grid)
+library(gridExtra)
+# library(sysfonts)
+# library(showtext)
+# font_add("minion", regular = "Minion Pro Regular.ttf",
+#          bold = "Minion Pro Bold.ttf", italic = "Minion Pro Cond Italic.otf")
+#showtext_auto() ## automatically use showtext for new devices
+#install.packages("extrafont")
 
-myFont<-"minion"
-showtext_auto() ## automatically use showtext for new devices
+#library(extrafont)
+#font_import()
+#loadfonts()
+myFont<-"sans"
 ```
 
 ```{r}
@@ -75,9 +81,9 @@ SEIR1 <- function(time, current_state, params){
     N <- S+E+I+H+R+Fa+V
     dS <- -(beta*S*I)/N + im*R - (v*ev*S)
     dE <- (beta*S*I)/N - l*E
-    dI <- l*E - ro*I - h*I - dl*I
-    dH <- h*I - rh*H - dh*H
-    dR <- ro*I + rh*H - im*R
+    dI <- l*E - ro*I - dl*I
+    dH <- ro*h*I - rh*H - dh*H
+    dR <- (1-h)*ro*I + rh*H - im*R
     dFa <- dl*I + dh*H
     dV <- (v*ev*S)
 
@@ -86,7 +92,7 @@ SEIR1 <- function(time, current_state, params){
 }
 
 
-params <- c(ev=0.942, im=1/140, beta=1.07/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074*(1/14), dl=0.00291, dh=0.015)
+params <- c(ev=0.942, im=1/140, beta=1.07/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074, dl=0.00291, dh=0.015)
 
 initial_state <- c(S=13794672, E=12024, I=6666,  H=998,R=105512,Fa=4321,V=0)
 
@@ -109,21 +115,22 @@ out.df <- out.df %>%
  #  mutate(
  #    percent_vaccinated=V/13924193
  #  )
-```
-
-```{r}
 
 infect<-data %>% 
   filter(Reported.Date>= ymd("2020-12-01")) %>% 
   filter(Reported.Date <= ymd("2021-04-03"))
+
 vax<-vax_data %>% 
   filter(report_date>= ymd("2020-12-01")) %>% 
   filter(report_date <= ymd("2021-04-03"))
+```
 
-library(grid)
-library(gridExtra)
+
+```{r}
+
+
 p<-ggplot() +
-  geom_line(data=out.df,aes(x=Date,y=I + E + H,color="Model")) +
+  geom_line(data=out.df,aes(x=Date,y=I+E+H,color="Model")) +
   geom_point(aes(x=ymd(Reported.Date),y=Confirmed.Positive,color="Actual data"), data=infect,size=0.5) +
   geom_vline(aes(xintercept = ymd("2020-12-26"),color="Lockdown starts (2020-12-26)"),show.legend = F,linetype="twodash") +
   geom_vline(aes(xintercept = ymd("2021-01-25"),color="Lockdown ends (2021-01-25)"),show.legend = F,linetype="twodash") +
@@ -132,9 +139,15 @@ p<-ggplot() +
 values=c("#E31837","#E31837","#F17E68","#797a7c"),
 guide = guide_legend(nrow=2,override.aes = list(
                          linetype = c(0,1,6,6), shape=c(20,NA,NA,NA)))) +
-  labs(title="",y="Confirmed positive cases (log scale)") +
+  
+  annotate("segment", x = ymd("2021-01-25"), xend=ymd("2021-01-25"), y = 23620, yend = 227798,
+           arrow = arrow(length = unit(.2,"cm")),size = 0.9) +
+
+  annotate("text", label="8.6x more cases", x = ymd("2021-01-25"), y = 75000,hjust=-0.1,size=3,fontface="bold") +
+  
+  labs(title="",y="Prevalent cases (I+E+H) (log scale)") +
   theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+  theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
 
 
 p2<-ggplot() +
@@ -147,11 +160,18 @@ p2<-ggplot() +
 values=c("#8E4465","#8E4465"),
 guide = guide_legend(override.aes = list(
                          linetype = c(0,1), shape=c(20,NA)))) +
-  labs(title="",y="Number of people hospitalized (log scale)") +
-  theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+  
+  annotate("segment", x = ymd("2021-01-25"), xend=ymd("2021-01-25"), y = 1398, yend = 3862,
+           arrow = arrow(length = unit(.2,"cm")),size = 0.9) +
 
-#legend.position="bottom"
+  annotate("text", label="1.8x more", x = ymd("2021-01-25"), y = 2200,hjust=-0.2,size=3,fontface="bold") +
+  annotate("text", label="hospitalized", x = ymd("2021-01-25"), y = 2200,hjust=-0.2,vjust=1.8,size=3,fontface="bold") +
+
+  
+  labs(title="",y="# of people hospitalized (log scale)") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
+
 
 p3<-ggplot() +
   geom_line(data=out.df,aes(x=Date,y=Fa,color="Model")) +
@@ -163,11 +183,17 @@ p3<-ggplot() +
 values=c("#004658","#004658"),
 guide = guide_legend(override.aes = list(
                          linetype = c(0,1), shape=c(20,NA)))) +
+  
+  annotate("segment", x = ymd("2021-01-25"), xend=ymd("2021-01-25"), y = 5846, yend = 8527,
+           arrow = arrow(length = unit(.2,"cm")),size = 0.9) +
+
+  annotate("text", label="0.5x more deaths", x = ymd("2021-01-25"), y = 8500,hjust=-0.1,size=3,fontface="bold") +
+  
   labs(title="",y="Total deaths (log scale)") +
   theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+  theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
 
-ggsave("plot1.png",plot=grid.arrange(p, p2, p3, ncol=3, top = textGrob("No lockdown 1",just = c("centre","top"),gp=gpar(fontsize=50,fontfamily=myFont,fontface="bold"))),width=13,height=5,dpi=300,limitsize = F)
+ggsave("plot1.png",plot=grid.arrange(p, p2, p3, ncol=3, top = textGrob("No winter 2020 lockdown",just = c("centre","top"),gp=gpar(fontsize=24,fontfamily=myFont,fontface="bold"))),width=10.665,height=4.1,dpi=300,limitsize = F)
 ```
 
 ```{r}
@@ -185,10 +211,10 @@ full1<-ggplot(data=out.df, aes(x=Date)) +
   scale_colour_manual("Compartments",
 breaks=c("Susceptible","Exposed","Infectious","Hospitalized","Recovered","Fatal","Vaccinated"),
 values=c("#FFc31f","#F17E68","#E31837","#8E4465","#008BB0","#004658","#797A7C")) +
-  labs(y="Number of people", x="Date", title = "SEIHRFV Model (No lockdown 1)") +
-  theme(plot.title = element_text(hjust = 0.5,face="bold"),text=element_text(family="minion",size=80))
+  labs(y="Number of people", x="Date", title = "SEIHRFV Model (No winter 2020 lockdown)") +
+  theme(plot.title = element_text(hjust = 0.5,face="bold"),text=element_text(family=myFont,size=13))
 
-ggsave("full_model_1.png",plot=full1,width=11,height=7.25,dpi=300,limitsize = F)
+ggsave("full_model_1.png",plot=full1,width=6.22,height=4.1,dpi=300,limitsize = F)
 ```
 
 
@@ -213,9 +239,9 @@ SEIR <- function(time, current_state, params){
     N <- S+E+I+H+R+Fa+V
     dS <- -(beta*S*I)/N + im*R - (v*ev*S)
     dE <- (beta*S*I)/N - l*E
-    dI <- l*E - ro*I - h*I - dl*I
-    dH <- h*I - rh*H - dh*H
-    dR <- ro*I + rh*H - im*R
+    dI <- l*E - ro*I - dl*I
+    dH <- ro*h*I - rh*H - dh*H
+    dR <- (1-h)*ro*I + rh*H - im*R
     dFa <- dl*I + dh*H
     dV <- (v*ev*S)
 
@@ -224,7 +250,7 @@ SEIR <- function(time, current_state, params){
 }
 
 
-params <- c(v= 0.000244, ev=0.942, im=1/140, beta=1.14/4.5,  l=1/5.5, rh=1/15, ro=1/14, h=0.074*(1/14), dh=0.0156, dl=0.000236 )
+params <- c(v= 0.000244, ev=0.942, im=1/140, beta=1.14/4.5,  l=1/5.5, rh=1/15, ro=1/14, h=0.074, dh=0.0156, dl=0.000236 )
 
 initial_state <- c(S=13349992, E=13023, I=7831,  H=1162,R=224423,Fa=7412,V=320350)
 
@@ -249,12 +275,17 @@ out2 <- out2 %>%
     # actual_vaccinated=Vaccinated2
   )
 
+infect<-data %>% 
+  filter(Reported.Date>= ymd("2021-03-20")) %>% 
+  filter(Reported.Date <= ymd("2021-05-29"))
+vax<-vax_data %>% 
+  filter(report_date>= ymd("2021-03-20")) %>% 
+  filter(report_date <= ymd("2021-05-29"))
 ```
 
 
 
 ```{r}
-
 full2<-ggplot(data=out2, aes(x=Date)) +
    geom_line(aes(y = S, color = "Susceptible")) +
    geom_line(aes(y = E, colour = "Exposed")) +
@@ -268,20 +299,15 @@ full2<-ggplot(data=out2, aes(x=Date)) +
   scale_colour_manual("Compartments",
 breaks=c("Susceptible","Exposed","Infectious","Hospitalized","Recovered","Fatal","Vaccinated"),
 values=c("#FFc31f","#F17E68","#E31837","#8E4465","#008BB0","#004658","#797A7C")) +
-  labs(y="Number of people", x="Date", title = "SEIHRFV Model (No lockdown 2)") +
-  theme(plot.title = element_text(hjust = 0.5,face="bold"),text=element_text(family="minion",size=80))
-ggsave("full_model_2.png",plot=full2,width=11,height=7.25,dpi=300,limitsize = F)
+  labs(y="Number of people", x="Date", title = "SEIHRFV Model (No spring 2021 lockdown)") +
+  theme(plot.title = element_text(hjust = 0.5,face="bold"),text=element_text(family=myFont,size=13))
+ggsave("full_model_2.png",plot=full2,width=6.22,height=4.1,dpi=300,limitsize = F)
 ```
 
 
 
 ```{r}
-infect<-data %>% 
-  filter(Reported.Date>= ymd("2021-03-20")) %>% 
-  filter(Reported.Date <= ymd("2021-09-03"))
-vax<-vax_data %>% 
-  filter(report_date>= ymd("2021-03-20")) %>% 
-  filter(report_date <= ymd("2021-09-03"))
+
 
 
 g<-ggplot() +
@@ -294,10 +320,15 @@ scale_colour_manual("",breaks=c("Actual data","Model","Lockdown starts (2021-04-
 values=c("#E31837","#E31837","#F17E68","#797a7c"),
 guide = guide_legend(nrow=2,override.aes = list(
                          linetype = c(0,1,6,6), shape=c(20,NA,NA,NA)))) +
-  labs(title="",y="Confirmed positive cases (log scale)") +
-  theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+  labs(title="",y="Prevalent cases (I+E+H) (log scale)") +
+  
+  annotate("segment", x = ymd("2021-05-29"), xend=ymd("2021-05-29"), y = 14423, yend = 2249257,
+           arrow = arrow(length = unit(.2,"cm")),size = 0.9) +
 
+  annotate("text", label="155x more cases", x = ymd("2021-05-29"), y = 200000,hjust=-0.1,size=3,fontface="bold") +
+  
+  theme_minimal()+
+theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
 
 g2<-ggplot() +
   geom_line(data=out2,aes(x=Date,y= H,color="Model")) +
@@ -309,10 +340,16 @@ g2<-ggplot() +
 values=c("#8E4465","#8E4465"),
 guide = guide_legend(override.aes = list(
                          linetype = c(0,1), shape=c(20,NA)))) +
-  labs(title="",y="Number of people hospitalized (log scale)") +
-  theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+  labs(title="",y="# of people hospitalized (log scale)") +
+  
+    annotate("segment", x = ymd("2021-05-29"), xend=ymd("2021-05-29"), y = 934, yend = 41951,
+           arrow = arrow(length = unit(.2,"cm")),size = .9) +
 
+  annotate("text", label="43.9x more", x = ymd("2021-05-29"), y = 10000,hjust=-0.2,size=3,fontface="bold") +
+  annotate("text", label="hospitalized", x = ymd("2021-05-29"), y = 10000,hjust=-0.2,vjust=1.8,size=3,fontface="bold") +
+  
+  theme_minimal()+
+theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
 
 
 g3<-ggplot() +
@@ -326,11 +363,16 @@ values=c("#004658","#004658"),
 guide = guide_legend(override.aes = list(
                          linetype = c(0,1), shape=c(20,NA)))) +
   labs(title="",y="Total deaths (log scale)") +
+  
+  annotate("segment", x = ymd("2021-05-29"), xend=ymd("2021-05-29"), y = 8726, yend = 19145,
+           arrow = arrow(length = unit(.2,"cm")),size = .9) +
+
+  annotate("text", label="1.2x more deaths", x = ymd("2021-05-29"), y = 13000,hjust=-0.1,size=3,fontface="bold") +
+  
   theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=40),legend.position="bottom")
+theme(plot.title = element_text(hjust = 0.5),axis.title=element_text(size=13),text=element_text(family=myFont,size=16),legend.position="bottom")
 
-
-ggsave("plot2.png",plot=grid.arrange(g, g2, g3, ncol=3, top = textGrob("No lockdown 2",just = c("centre","top"),gp=gpar(fontsize=50,fontfamily=myFont,fontface="bold"))),width=13,height=5,dpi=300,limitsize = F)
+ggsave("plot2.png",plot=grid.arrange(g, g2, g3, ncol=3, top = textGrob("No spring 2021 lockdown",just = c("centre","top"),gp=gpar(fontsize=24,fontfamily=myFont,fontface="bold"))),width=10.665,height=4.1,dpi=300,limitsize = F)
 ```
 
 
@@ -342,12 +384,12 @@ Vaccinated<- vax_data %>%
     actual_vaccinated=total_individuals_fully_vaccinated/13924193
   )
 
-params <- c(v=0.00268, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074*(1/14), dl=8.38e-05, dh=0.0147
+params <- c(v=0.00268, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074, dl=8.38e-05, dh=0.0147
 )
 
 initial_state <- c(S=12973414, E=6273, I=7216,  H=934,R=268490,Fa=8726,V=659139)
 
-times <- 0:4000
+times <- 0:4380
 
 
 model <- ode(initial_state, times, SEIR, params)
@@ -366,12 +408,12 @@ out.df1<-as.data.frame(model)
 ```
 
 ```{r}
-params <- c(v=0.00131, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074*(1/14), dl=8.38e-05, dh=0.0147
+params <- c(v=0.00131, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074, dl=8.38e-05, dh=0.0147
 )
 
 initial_state <- c(S = 12973414, E = 6273, I = 7216, H = 934, R = 268490, Fa = 8726, V = 659139)
 
-times <- 0:4000
+times <- 0:4380
 
 
 model <- ode(initial_state, times, SEIR, params)
@@ -390,12 +432,12 @@ out.df2<-as.data.frame(model)
 ```
 
 ```{r}
-params <- c(v=0.000347, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074*(1/14), dl=8.38e-05, dh=0.0147
+params <- c(v=0.000347, ev=1, im=1/140, beta=0.836/4.5, l=1/5.5, rh=1/15, ro=1/14, h=0.074, dl=8.38e-05, dh=0.0147
 )
 
 initial_state <- c(S = 12973414, E = 6273, I = 7216, H = 934, R = 268490, Fa = 8726, V = 659139)
 
-times <- 0:4000
+times <- 0:4380
 
 
 model <- ode(initial_state, times, SEIR, params)
@@ -422,7 +464,7 @@ v_zoom<-ggplot(data=out.df1) +
 
   geom_line(data=out.df2,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (Last 14 days)")) +
      #geom_line(aes(y = percent_death, colour = "Deaths")) +
-  geom_line(data=out.df3,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (All Time Average)")) +
+  geom_line(data=out.df3,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (Average Jan-May)")) +
 
   geom_point(aes(x=ymd(report_date),y=actual_vaccinated,color="Actual data"),data=Vaccinated,size=0.1)+
   
@@ -433,35 +475,42 @@ v_zoom<-ggplot(data=out.df1) +
     
   #facet_zoom(ylim=c(0.00,0.4),xlim = c(ymd("2021-01-01"), ymd("2022-06-01")),horizontal=FALSE,zoom.size=1) +
 
-geom_point(data = filter(out.df1, Reported.Date == "2021-08-06"),aes(x=Reported.Date,y=percent_vaccinated),color="#004658")+
-geom_label_repel(data = filter(out.df1, Reported.Date == "2021-08-06"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-08-06",family=myFont),color="#004658",
+geom_point(data = filter(out.df1, Reported.Date == "2021-08-07"),aes(x=Reported.Date,y=percent_vaccinated),color="#5A8D89")+
+geom_label_repel(data = filter(out.df1, Reported.Date == "2021-08-07"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-08-07",family=myFont),color="#5A8D89",
                  nudge_x = -20,nudge_y = 0.03,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-geom_point(data = filter(out.df1, Reported.Date == "2021-09-02"),aes(x=Reported.Date,y=percent_vaccinated),color="#004658")+
-geom_label_repel(data = filter(out.df1, Reported.Date == "2021-09-02"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-09-02",family=myFont),color="#004658",
+                     size= 5)+
+geom_point(data = filter(out.df1, Reported.Date == "2021-09-03"),aes(x=Reported.Date,y=percent_vaccinated),color="#5A8D89")+
+geom_label_repel(data = filter(out.df1, Reported.Date == "2021-09-03"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-09-03",family=myFont),color="#5A8D89",
                  nudge_y = 0.06,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-  geom_point(data = filter(out.df2, Reported.Date == "2021-12-03"),aes(x=Reported.Date,y=percent_vaccinated),color="#8e4465")+
-geom_label_repel(data = filter(out.df2, Reported.Date == "2021-12-03"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-12-03",family=myFont),color="#8e4465",
+                     size= 5)+
+  geom_point(data = filter(out.df2, Reported.Date == "2021-12-24"),aes(x=Reported.Date,y=percent_vaccinated),color="#E29578")+
+geom_label_repel(data = filter(out.df2, Reported.Date == "2021-12-24"),aes(x=Reported.Date,y=percent_vaccinated,label="2021-12-03",family=myFont),color="#E29578",
                  nudge_y = 0.03,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-  annotate("text",label = "Present", x= ymd("2021-05-29"),y = 0.35,angle=90, vjust = -1,family=myFont,size=15,color="black")+
+                     size= 5)+
+  geom_point(data = filter(out.df2, Reported.Date == "2022-04-14"),aes(x=Reported.Date,y=percent_vaccinated),color="#E29578")+
+geom_label_repel(data = filter(out.df2, Reported.Date == "2022-04-14"),aes(x=Reported.Date,y=percent_vaccinated,label="2022-04-14",family=myFont),color="#E29578",
+                 nudge_y = 0.03,
+                  arrow = arrow(length = unit(0.02, "npc")),
+                     size= 5)+
+  annotate("text",label = "Present", x= ymd("2021-05-29"),y = 0.35,angle=90, vjust = -1,family=myFont,size=5,color="black")+
+  annotate("text",label = "Step 2", x= ymd("2021-01-15"),y = 0.2,vjust = -0.5,family=myFont,size=5,color="black")+
+  annotate("text",label = "Step 3", x= ymd("2021-01-15"),y = 0.25,vjust = -0.5,family=myFont,size=5,color="black")+
 
   scale_y_continuous(limits=c(0.00,0.4),breaks=c(0,0.1,0.2,0.25,0.3,0.4))+
   scale_x_date(limits=c(ymd("2021-01-01"), ymd("2022-06-01")))+
   theme_minimal()+
   scale_colour_manual("",
-    breaks=c("Actual data","Vaccination rate (2021-05-29)","Vaccination rate (Last 14 days)","Vaccination rate (All Time Average)"),
-values=c("black","#004658","#8e4465","#f17e68"),
+    breaks=c("Actual data","Vaccination rate (2021-05-29)","Vaccination rate (Last 14 days)","Vaccination rate (Average Jan-May)"),
+values=c("black","#5A8D89","#E29578","#B3AD9B"),
 guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid","solid","solid"), shape=c(20,NA,NA,NA)))) +
   labs(y="Percent of the population vaccinated", x="Date") +
-theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=50),
-      panel.border = element_rect(colour = "#ffe498",fill=NA, size=1))
-ggsave("vax_zoomed.png",plot=v_zoom,width=11,height=5,dpi=300,limitsize = F)
+theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=18),
+      panel.border = element_rect(colour = "#797a7c",fill=NA, size=1))
+ggsave("vax_zoomed1.png",plot=v_zoom,width=11,height=5,dpi=300,limitsize = F)
 ```
 
 
@@ -472,7 +521,7 @@ v<-ggplot(data=out.df1) +
 
   geom_line(data=out.df2,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (Last 14 days)")) +
      #geom_line(aes(y = percent_death, colour = "Deaths")) +
-  geom_line(data=out.df3,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (All Time Average)")) +
+  geom_line(data=out.df3,aes(x=Reported.Date,y = percent_vaccinated, colour = "Vaccination rate (Average Jan-May)")) +
 
   geom_point(aes(x=ymd(report_date),y=actual_vaccinated,color="Actual data"),data=Vaccinated,size=0.25)+
   
@@ -484,35 +533,93 @@ v<-ggplot(data=out.df1) +
     
   #facet_zoom(ylim=c(0.00,0.4),xlim = c(ymd("2021-01-01"), ymd("2022-06-01")),horizontal=FALSE,zoom.size=1) +
 
-geom_point(data = filter(out.df1, Reported.Date == "2022-09-23"),aes(x=Reported.Date,y=percent_vaccinated),color="#004658")+
-geom_label_repel(data = filter(out.df1, Reported.Date == "2022-09-23"),aes(x=Reported.Date,y=percent_vaccinated,label="2022-09-23",family=myFont),color="#004658",
+geom_point(data = filter(out.df1, Reported.Date == "2022-10-15"),aes(x=Reported.Date,y=percent_vaccinated),color="#5A8D89")+
+geom_label_repel(data = filter(out.df1, Reported.Date == "2022-10-15"),aes(x=Reported.Date,y=percent_vaccinated,label="2022-10-15",family=myFont),color="#5A8D89",
                  nudge_x = -100,nudge_y = 0.2,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-geom_point(data = filter(out.df2, Reported.Date == "2024-02-19"),aes(x=Reported.Date,y=percent_vaccinated),color="#8e4465")+
-geom_label_repel(data = filter(out.df2, Reported.Date == "2024-02-19"),aes(x=Reported.Date,y=percent_vaccinated,label="2024-02-19",family=myFont),color="#8e4465",
+                     size= 5)+
+geom_point(data = filter(out.df2, Reported.Date == "2024-04-20"),aes(x=Reported.Date,y=percent_vaccinated),color="#E29578")+
+geom_label_repel(data = filter(out.df2, Reported.Date == "2024-04-20"),aes(x=Reported.Date,y=percent_vaccinated,label="2024-04-20",family=myFont),color="#E29578",
                  nudge_y = -0.1,nudge_x = 200,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-  geom_point(data = filter(out.df3, Reported.Date == "2032-02-04"),aes(x=Reported.Date,y=percent_vaccinated),color="#f17e68")+
-geom_label_repel(data = filter(out.df3, Reported.Date == "2032-02-04"),aes(x=Reported.Date,y=percent_vaccinated,label="2032-02-04",family=myFont),color="#f17e68",
+                     size= 5)+
+  geom_point(data = filter(out.df3, Reported.Date == "2032-10-29"),aes(x=Reported.Date,y=percent_vaccinated),color="#B3AD9B")+
+geom_label_repel(data = filter(out.df3, Reported.Date == "2032-10-29"),aes(x=Reported.Date,y=percent_vaccinated,label="2032-10-29",family=myFont),color="#B3AD9B",
                  nudge_y = 0.1,
                   arrow = arrow(length = unit(0.02, "npc")),
-                     size= 15)+
-annotate("text",label = "Present", x= ymd("2021-05-29"),y = 0.8,angle=90, vjust = -1,family=myFont,size=15,color="black")+
-annotate("text",label = "Herd immunity", x= ymd("2027-05-29"),y = 0.62,vjust=-0.1,family=myFont,size=15,color="#E31837")+
+                     size= 5)+
+annotate("text",label = "Present", x= ymd("2021-05-29"),y = 0.8,angle=90, vjust = -1,family=myFont,size=5,color="black")+
+annotate("text",label = "Herd immunity", x= ymd("2027-05-29"),y = 0.62,vjust=-0.1,family=myFont,size=5,color="#E31837")+
   scale_y_continuous(breaks=c(0,0.1,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1))+
   theme_minimal()+
   scale_colour_manual("",
-    breaks=c("Actual data","Vaccination rate (2021-05-29)","Vaccination rate (Last 14 days)","Vaccination rate (All Time Average)"),
-values=c("black","#004658","#8e4465","#f17e68"),
+    breaks=c("Actual data","Vaccination rate (2021-05-29)","Vaccination rate (Last 14 days)","Vaccination rate (Average Jan-May)"),
+values=c("black","#5A8D89","#E29578","#B3AD9B"),
 guide = guide_legend(override.aes = list(
                          linetype = c("blank", "solid","solid","solid"), shape=c(20,NA,NA,NA)))) +
-  labs(y="Percent of the population vaccinated", x="Date") +
-theme(plot.title = element_text(hjust = 0.5),text=element_text(family=myFont,size=50)) +
-  annotate("rect", xmin=ymd("2021-01-01"), xmax=ymd("2022-06-01"), ymin=-0.03 , ymax=0.43, alpha=0.1, color="#ffe498", fill="#ffe498")
+  labs(title="Vaccination milestones",y="Percent of the population vaccinated", x="Date") +
+theme(plot.title = element_text(hjust = 0.5,face="bold"),text=element_text(family=myFont,size=18)) +
+  annotate("rect", xmin=ymd("2021-01-01"), xmax=ymd("2022-06-01"), ymin=-0.03 , ymax=0.43, alpha=0.1, color="#797a7c", fill="#797a7c")
 ggsave("vax.png",plot=v,width=11,height=5,dpi=300,limitsize = F)
 
   
+```
+
+
+```{r}
+#bar plots
+library(scales)
+vaccine_rates <- c("0.000347\n(Average Jan-May)", "0.00131\n(Last 14 days)", "0.00268\n(2021-05-29)")
+vaccine3 <- out.df1 %>%
+  filter(Reported.Date <  ymd("2022-10-15"))
+
+vaccine2 <- out.df2 %>%
+  filter(Reported.Date <  ymd("2024-04-20"))
+
+vaccine1 <- out.df3 %>%
+  filter(Reported.Date <  ymd("2032-10-29"))
+
+peak_cases <- c(max(vaccine1$I + vaccine1$E + vaccine1$H), max(vaccine2$I + vaccine2$E + vaccine2$H), max(vaccine3$I + vaccine3$E + vaccine3$H))
+total_deaths <- c(max(vaccine1$Fa), max(vaccine2$Fa), max(vaccine3$Fa))
+
+df <- data.frame(vaccine_rates, peak_cases, total_deaths)
+
+b1<-ggplot() + 
+  geom_bar(aes(x = as.factor(vaccine_rates), y = peak_cases), fill = "#e31837", stat = "identity", data = df) +
+  geom_label_repel(aes(x="0.00131\n(Last 14 days)",y=2602628,label="2,402,628 peak active cases by this date",family=myFont),color="black",direction="y",segment.size=0.2, 
+                 nudge_x=50,nudge_y = 300000,
+                  arrow = arrow(length = unit(0.02, "npc")),
+                     size= 4)+
+  annotate("label", x = "0.000347\n(Average Jan-May)", y = 3160424, label = "2032-10-29",size=4,color="#B3AD9B") +
+  annotate("label", x = "0.00131\n(Last 14 days)", y = 2502628, label = "2024-04-20",size=4,color="#E29578") +
+  annotate("label", x = "0.00268\n(2021-05-29)", y = 1699752, label = "2022-10-15",size=4,color="#5A8D89") +
+  
+  scale_y_continuous(limits = c(0,3500000), labels = label_comma()) +
+  scale_x_discrete(labels=c("0.000347\n(Average Jan-May)", "0.00131\n(Last 14 days)", "0.00268\n(2021-05-29)"))+
+  labs(title = "Peak active cases before herd immunity",
+       x = "Vaccination rates", y = "Peak number of active cases") +
+  theme_minimal() +
+  theme(plot.title=element_text(hjust=0.5,face="bold"),panel.grid.major.x = element_blank(),text=element_text(family=myFont,size=13),
+        axis.text.x=element_text(lineheight = 1))
+ggsave("bar1(1).png",b1,height=5.5,width=5.35,dpi=300)
+
+
+b2<-ggplot() +
+  geom_bar(aes(x = as.factor(vaccine_rates), y = total_deaths), fill = "#004658", stat = "identity", data = df) +
+  geom_label_repel(aes(x="0.00131\n(Last 14 days)",y=325910+75000,label="325,910 deaths by this date",family=myFont),color="black",direction="y",segment.size=0.2, 
+                 nudge_x=50,nudge_y = 150000,
+                  arrow = arrow(length = unit(0.02, "npc")),
+                     size= 4)+
+  annotate("label", x = "0.000347\n(Average Jan-May)", y = 	1181175+40000, label = "2032-10-29",size=4,color="#B3AD9B") +
+  annotate("label", x = "0.00131\n(Last 14 days)", y = 	325910+40000, label = "2024-04-20",size=4,color="#E29578") +
+  annotate("label", x = "0.00268\n(2021-05-29)", y = 	151666+40000, label = "2022-10-15",size=4,color="#5A8D89") +
+  scale_y_continuous(breaks = c(150000, 325000, 500000, 750000, 1250000),limits=c(0,1300000), labels = label_comma()) +
+  scale_x_discrete(labels=c("0.000347\n(Average Jan-May)", "0.00131\n(Last 14 days)", "0.00268\n(2021-05-29)"))+
+  labs(title = "Total deaths before herd immunity",
+       x = "Vaccination rates", y = "Total number of deaths") +
+  theme_minimal() +
+  theme(plot.title=element_text(hjust=0.5,face="bold"),panel.grid.major.x = element_blank(),text=element_text(family=myFont,size=13),
+  axis.text.x=element_text(lineheight = 1))
+ggsave("bar2.png",b2,height=5.5,width=5.35,dpi=300)
 ```
 
